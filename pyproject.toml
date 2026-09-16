@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sberindex-shocks"
+version = "0.1.0"
+description = "Прогноз потребительских расходов МО и раннее обнаружение структурных сдвигов по данным СберИндекса"
+authors = [{name = "Ravil Akhtyamov"}]
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+  "numpy>=1.26", "pandas>=2.1", "pyarrow>=14", "pyyaml>=6", "scipy>=1.11",
+  "statsforecast>=1.7", "prophet>=1.1.5", "lightgbm>=4.3", "ruptures>=1.1.9", "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+foundation = ["torch>=2.2", "chronos-forecasting>=1.5"]
+timesfm = ["timesfm[torch]>=1.2"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

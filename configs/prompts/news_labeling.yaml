@@ -1,0 +1,22 @@
+# Схема разметки новостей языковой моделью (§5.2 дизайна). Ответ — строго JSON по схеме.
+version: 1
+schema:
+  type:
+    enum: [key_rate, mortgage_rules, subsidy_program, tariff, social_payment, disaster, trade_restriction, holiday, other, irrelevant]
+  geo:
+    description: "RU для федеральных; иначе название региона или МО, как в тексте"
+  direction:
+    enum: [positive, negative, unclear]
+    description: "ожидаемое влияние на безналичные потребительские расходы жителей"
+  effective_date:
+    description: "дата вступления в силу, если названа в тексте, иначе null (YYYY-MM-DD)"
+  affected_categories:
+    items_enum: [all, food, health, restaurants, transport, marketplaces]
+  confidence: {type: number, min: 0, max: 1}
+system_prompt: |
+  Ты размечаешь новости для экономического исследования потребительских расходов в муниципалитетах России.
+  Отвечай только JSON по схеме. Не додумывай даты и географию, которых нет в тексте: ставь null.
+  Если новость не про событие, способное изменить расходы жителей, ставь type=irrelevant.
+validation:
+  manual_sample: 200
+  metrics: [accuracy_type, accuracy_geo, f1_direction]

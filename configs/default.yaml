@@ -1,0 +1,48 @@
+# Все параметры прогона. Любой ключ переопределяется из командной строки:
+#   python -m sshocks.cli forecast --set forecast.max_series=200
+seed: 42
+output_dir: outputs
+
+data:
+  raw_dir: data/raw
+  file: sberindex_mo_spending.parquet     # или sberindex_mo_spending.csv.zip
+  hashes: data/hashes.json
+  download_if_missing: false
+  category: Все категории                  # Продовольствие | Здоровье | Общественное питание | Транспорт | Маркетплейсы
+  min_obs: 24                               # только ряды с полной историей 01.2023–12.2024
+
+events:
+  registry: data/events/registry.csv
+  only_verified: false                      # в финальном прогоне — true
+
+forecast:
+  horizons: [1, 2, 3]
+  origins: ["2024-06-01", "2024-07-01", "2024-08-01", "2024-09-01"]
+  max_series: 400                           # null — все ряды; Prophet на всех ≈ 30–40 мин
+  models:
+    snaive:        {}
+    snaive_growth: {window: 3}
+    ets_relative:  {}
+    prophet:       {yearly_fourier: 3}
+    lgbm:          {use_events: true, min_growth_obs: 3}
+    lgbm_noevents: {fn: lgbm, use_events: false, min_growth_obs: 3}
+    chronos:       {checkpoint: amazon/chronos-bolt-small, mode: relative, enabled: true}
+    chronos_level: {fn: chronos, checkpoint: amazon/chronos-bolt-small, mode: level, enabled: true}
+    timesfm:       {checkpoint: google/timesfm-2.0-500m-pytorch, mode: relative, enabled: false}
+
+changepoint:
+  eval_start: "2024-04-01"                  # прирост г/г определён с 01.2024, детекторам нужно 3 точки истории
+  eval_end: "2024-12-01"
+  max_series: 600
+  repeats: 3
+  share_shocked: 0.5
+  deltas: [-0.20, -0.10, -0.05, 0.05, 0.10, 0.20]
+  max_delay: 2
+  news_simulation: {recall_news: 0.6, false_news_rate: 0.05}
+  detectors:
+    zscore:        {k: 3.0}
+    cross_section: {k: 3.0}
+    cusum:         {k: 0.5, h: 4.0}
+    bocpd:         {hazard: 0.04, threshold: 0.5, use_news: true, event_boost: 6.0}
+    pelt:          {penalty: 3.0, recent: 1}
+    binseg:        {penalty: 3.0, recent: 1}

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "potrebitelskie-beznalicnye-rashody-na-urovne-munizipalnyh-obrazovanij",
+  "source": "https://sberindex.ru/ru/dashboards/potrebitelskie-beznalicnye-rashody-na-urovne-munizipalnyh-obrazovanij",
+  "api": "https://sberindex.ru/api/dataset/v1/download/<dataset_id>/{parquet|csv}",
+  "server_filename": "potrebitelskie-beznalicnye-rashody-na-urovne-munizipalnyh-obrazovanij_ru_1764079373653",
+  "retrieved": "2026-09-16",
+  "files": {
+    "sberindex_mo_spending.parquet": {
+      "sha256": "dbe07d6a3a974ab4fd13258a36382a3b056aa35d12ed6c2b132ae5775115e0f1",
+      "bytes": 1364792
+    },
+    "sberindex_mo_spending.csv.zip": {
+      "sha256": "e9a389e57dad7ec723ac58470fda2b2f870062a330efa979cb3952dd7513416d",
+      "bytes": 2251684
+    }
+  }
+}

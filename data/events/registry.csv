@@ -1,0 +1,10 @@
+event_id,announce_date,effective_date,scope,mo_pattern,type,affected_categories,expected_sign,source_url,verified,note
+E001,2023-08-15,2023-08-15,national,,key_rate,all,negative,,no,ключевая ставка 12 %; внеочередное заседание; сверить с пресс-релизом Банка России
+E002,2023-10-27,2023-10-27,national,,key_rate,all,negative,,no,ключевая ставка 15 %; сверить
+E003,2023-12-15,2023-12-15,national,,key_rate,all,negative,,no,ключевая ставка 16 %; сверить
+E004,2024-07-26,2024-07-26,national,,key_rate,all,negative,,no,ключевая ставка 18 %; сверить
+E005,2024-09-13,2024-09-13,national,,key_rate,all,negative,,no,ключевая ставка 19 %; сверить
+E006,2024-10-25,2024-10-25,national,,key_rate,all,negative,,no,ключевая ставка 21 %; сверить
+E007,,2024-07-01,national,,mortgage_rules,all,negative,,no,завершение массовой льготной ипотеки; дату объявления уточнить
+E008,,2024-07-01,national,,tariff,all,negative,,no,индексация коммунальных тарифов; дату объявления и величину уточнить
+E101,2024-04-05,2024-04-01,region,городской округ город Орск|городской округ город Новотроицк|городской округ город Оренбург,disaster_payments,all,positive,,no,прорыв дамбы в Орске и паводок в Оренбургской области; выплаты пострадавшим; даты и перечень МО сверить
