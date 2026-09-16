@@ -27,10 +27,10 @@ class Unavailable(RuntimeError):
     pass
 
 
-def _context(wide: pd.DataFrame, mode: str):
+def _context(wide: pd.DataFrame, mode: str, panel: pd.DataFrame | None = None):
     if mode == "level":
         return wide, None
-    cf = common_factor(wide)
+    cf = common_factor(wide, panel)
     return np.log(wide).sub(cf, axis=1), cf
 
 
@@ -43,7 +43,7 @@ def _restore(pred: pd.DataFrame, wide: pd.DataFrame, cf, mode: str, horizons):
 
 
 def chronos(wide: pd.DataFrame, horizons, checkpoint: str = "amazon/chronos-bolt-small",
-            mode: str = "relative", device: str = "cpu", batch: int = 256, **_):
+            mode: str = "relative", device: str = "cpu", batch: int = 256, panel: pd.DataFrame | None = None, **_):
     try:
         import torch
         from chronos import BaseChronosPipeline
@@ -53,7 +53,7 @@ def chronos(wide: pd.DataFrame, horizons, checkpoint: str = "amazon/chronos-bolt
         pipe = BaseChronosPipeline.from_pretrained(checkpoint, device_map=device, torch_dtype=torch.float32)
     except Exception as e:  # нет сети или весов
         raise Unavailable(f"не удалось загрузить {checkpoint}: {e}")
-    ctx, cf = _context(wide, mode)
+    ctx, cf = _context(wide, mode, panel)
     H = max(horizons)
     preds = []
     for i in range(0, len(ctx), batch):
@@ -66,7 +66,7 @@ def chronos(wide: pd.DataFrame, horizons, checkpoint: str = "amazon/chronos-bolt
 
 
 def timesfm(wide: pd.DataFrame, horizons, checkpoint: str = "google/timesfm-2.0-500m-pytorch",
-            mode: str = "relative", **_):
+            mode: str = "relative", panel: pd.DataFrame | None = None, **_):
     try:
         import timesfm as tfm
     except ImportError as e:
@@ -78,7 +78,7 @@ def timesfm(wide: pd.DataFrame, horizons, checkpoint: str = "google/timesfm-2.0-
             checkpoint=tfm.TimesFmCheckpoint(huggingface_repo_id=checkpoint))
     except Exception as e:
         raise Unavailable(f"не удалось загрузить {checkpoint}: {e}")
-    ctx, cf = _context(wide, mode)
+    ctx, cf = _context(wide, mode, panel)
     inputs = [r[~np.isnan(r)] for r in ctx.to_numpy()]
     point, _ = model.forecast(inputs, freq=[1] * len(inputs))
     pred = pd.DataFrame({h: point[:, h - 1] for h in horizons}, index=wide.index)

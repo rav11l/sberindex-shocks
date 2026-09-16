@@ -36,12 +36,13 @@ def snaive_growth(wide: pd.DataFrame, horizons, window: int = 1, **_):
     return pd.DataFrame(out, index=wide.index)
 
 
-def common_factor(wide: pd.DataFrame) -> pd.Series:
-    """Общий фактор: медиана log-уровня по рядам в каждом месяце."""
-    return np.log(wide).median(axis=0)
+def common_factor(wide: pd.DataFrame, panel: pd.DataFrame | None = None) -> pd.Series:
+    """Общий фактор: медиана log-уровня по рядам в каждом месяце (по всей панели, если передана)."""
+    src = panel if panel is not None else wide
+    return np.log(src).median(axis=0).reindex(wide.columns)
 
 
-def ets_relative(wide: pd.DataFrame, horizons, **_):
+def ets_relative(wide: pd.DataFrame, horizons, panel: pd.DataFrame | None = None, **_):
     """ETS без сезонности на отклонении ряда от общего фактора; фактор — snaive_growth по медиане.
 
     Короткие ряды (24 месяца) не позволяют оценить сезонность внутри ряда; её несёт общий
@@ -50,7 +51,7 @@ def ets_relative(wide: pd.DataFrame, horizons, **_):
     from statsforecast import StatsForecast
     from statsforecast.models import AutoETS
 
-    cf = common_factor(wide)
+    cf = common_factor(wide, panel)
     rel = np.log(wide).sub(cf, axis=1)
     H = max(horizons)
     long = rel.stack().rename("y").reset_index()

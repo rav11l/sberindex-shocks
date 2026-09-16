@@ -26,11 +26,15 @@ log = logging.getLogger(__name__)
 MODELS = {**baselines.REGISTRY, **foundation.REGISTRY, "lgbm": global_gbm.fit_predict}
 
 
-def run_model(name: str, spec: dict, wide: pd.DataFrame, origin: pd.Timestamp, horizons, reg):
+def run_model(name: str, spec: dict, wide: pd.DataFrame, origin: pd.Timestamp, horizons, reg,
+              panel: pd.DataFrame | None = None):
     fn = MODELS[spec.get("fn", name)]
     params = {k: v for k, v in spec.items() if k not in {"fn", "enabled"}}
     if spec.get("fn", name) == "lgbm":
         params["reg"] = reg if spec.get("use_events", True) else None
+    if panel is not None:
+        # общий фактор считается по всей панели, даже если прогноз строится для выборки МО
+        params["panel"] = panel.loc[:, :origin]
     train = wide.loc[:, :origin]
     return fn(train, horizons, **params)
 
@@ -38,6 +42,7 @@ def run_model(name: str, spec: dict, wide: pd.DataFrame, origin: pd.Timestamp, h
 def backtest(wide: pd.DataFrame, cfg: dict, reg: pd.DataFrame | None = None, series: pd.Index | None = None):
     horizons = cfg["forecast"]["horizons"]
     origins = [pd.Timestamp(o) for o in cfg["forecast"]["origins"]]
+    panel = wide
     if series is not None:
         wide = wide.loc[series]
     rows, status = [], []
@@ -47,7 +52,7 @@ def backtest(wide: pd.DataFrame, cfg: dict, reg: pd.DataFrame | None = None, ser
         for o in origins:
             t0 = time.time()
             try:
-                fc = run_model(name, spec, wide, o, horizons, reg)
+                fc = run_model(name, spec, wide, o, horizons, reg, panel)
             except Unavailable as e:
                 log.warning("%s пропущена: %s", name, e)
                 status.append({"model": name, "origin": o, "status": "skipped", "note": str(e)})
