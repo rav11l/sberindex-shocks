@@ -181,6 +181,10 @@ def label(ev: pd.DataFrame, rules: dict, gaz: pd.DataFrame) -> pd.DataFrame:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 m &= url.str.contains(r["url_require"], regex=True)
+        if r.get("url_exclude"):          # контекст, при котором совпадение не про экономический шок
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                m &= ~url.str.contains(r["url_exclude"], regex=True)
         sub = df[m].assign(type=typ, rule=why[m], expected_sign=r.get("expected_sign", "unclear"),
                            scope_rule=r.get("scope", "auto"))
         hits.append(sub)
@@ -195,6 +199,9 @@ def label(ev: pd.DataFrame, rules: dict, gaz: pd.DataFrame) -> pd.DataFrame:
     is_country = lab["ActionGeo_Type"].eq("1")
     lab["scope"] = np.where(lab["scope_rule"].eq("national") | is_country, "national",
                             np.where(lab["mo"].notna(), "mo", "unmatched"))
+    # scope: local — у типа нет федерального смысла: привязка к стране целиком означает, что место
+    # события не определено (для ЧС это Газа, Непал и т. п. при российском актёре), такие записи отбрасываются
+    lab = lab[~(lab["scope_rule"].eq("local") & lab["scope"].eq("national"))]
     lab["geo"] = np.where(lab["scope"].eq("national"), "RU",
                           np.where(lab["scope"].eq("mo"), "^" + lab["mo"].fillna("").map(re.escape) + "$", ""))
     lab["n_articles"] = pd.to_numeric(lab["NumArticles"], errors="coerce").fillna(1)
@@ -208,14 +215,19 @@ def label(ev: pd.DataFrame, rules: dict, gaz: pd.DataFrame) -> pd.DataFrame:
 
 
 def review_sample(lab: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
-    """Выборка для ручной проверки, стратифицированная по типу. Колонку check заполняет человек:
+    """Выборка для ручной проверки: страты (тип, география) без непривязанных, в каждой не меньше
+    min(10, размер страты), остальное пропорционально размеру. Колонку check заполняет человек:
     ok | wrong_type | wrong_geo | irrelevant | dead_link."""
     use = lab[lab["scope"] != "unmatched"]
     if use.empty:
-        return use.assign(check="")
-    k = max(1, n // use["type"].nunique())
-    s = use.groupby("type", group_keys=False).apply(lambda g: g.sample(min(len(g), k), random_state=seed))
-    return s.assign(check="", comment="").reset_index(drop=True)
+        return use.assign(check="", comment="")
+    sizes = use.groupby(["type", "scope"]).size()
+    base = sizes.clip(upper=10)
+    rest = max(0, n - int(base.sum()))
+    extra = ((sizes - base) / max(1, (sizes - base).sum()) * rest).round().astype(int)
+    take = (base + extra).clip(upper=sizes)
+    parts = [g.sample(int(take[k]), random_state=seed) for k, g in use.groupby(["type", "scope"])]
+    return pd.concat(parts).assign(check="", comment="").sort_values("published_at").reset_index(drop=True)
 
 
 def review_stats(rev: pd.DataFrame) -> pd.DataFrame:
@@ -233,6 +245,8 @@ def registry_recall(lab: pd.DataFrame, reg: pd.DataFrame, window_days: int = 7) 
     rows = []
     for _, e in reg.iterrows():
         base = e["type"].replace("disaster_payments", "disaster")
+        if e["scope"] == "national":
+            continue                      # федеральные решения берутся из реестра, поток их не ловит (docs/full_run.md)
         cand = lab[lab["type"].eq(base)]
         if e["scope"] != "national":
             cand = cand[cand["mo"].fillna("").str.contains(e["mo_pattern"], regex=True)]

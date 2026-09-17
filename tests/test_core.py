@@ -106,7 +106,7 @@ def test_gdelt_parse_label_recall():
     assert lab[lab["type"] == "key_rate"]["scope"].eq("national").all()
     reg = events.load_registry("data/events/registry.csv")
     rec = gdelt.registry_recall(lab, reg).set_index("event_id")
-    assert rec.loc["E101", "found"] and rec.loc["E005", "found"] and not rec.loc["E102", "found"]
+    assert rec.loc["E101", "found"] and not rec.loc["E102", "found"] and "E005" not in rec.index   # федеральные не сверяются
 
 
 def test_gdelt_fetch_resumes(tmp_path, monkeypatch):

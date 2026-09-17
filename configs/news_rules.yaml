@@ -5,7 +5,9 @@
 # expected_sign — ожидаемый знак влияния на безналичные расходы жителей.
 # url_require — регулярное выражение, которое тоже должно встретиться в адресе (контекст России):
 #   без него геокодер GDELT относит к России британские и американские новости об ипотеке.
-# scope: national — новость всегда федеральная; auto — по геопривязке места события.
+# url_exclude — если встречается в адресе, совпадение отбрасывается (военный контекст эвакуаций и т. п.).
+# scope: national — новость всегда федеральная; auto — по геопривязке места события;
+#   local — только привязка к МО (привязка к стране целиком отбрасывается).
 version: 1
 types:
   key_rate:
@@ -29,9 +31,10 @@ types:
     expected_sign: positive
     url_regex: "vyplat|posobi|materinsk\\w*-kapital|indeksats\\w*-pensi|pension-(increase|indexation)"
   disaster:
-    scope: auto
+    scope: local
     expected_sign: positive          # выплаты пострадавшим; прямой ущерб даёт обратный знак, это проверяется в отчёте
     url_regex: "navodnen|pavod|zatoplen|podtoplen|proryv-damb|dambu|evakuats|flood|dam-(burst|breach)|evacuat"
+    url_exclude: "ukrain|kyiv|kiev|drone|shell|missile|strike|attack|incursion|war-|nato|zaporizh|kakhovka|nuclear-plant|front|border-cities|belgorod|kursk|bryansk|shebekino|sudzha"
     cameo_codes: ["0233", "073"]      # призыв к гуманитарной помощи; оказание гуманитарной помощи
     cameo_requires_url: true
   trade_restriction:

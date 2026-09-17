@@ -23,6 +23,8 @@ news:                                       # новостной поток: GDE
   raw_dir: data/raw/gdelt                   # отфильтрованные записи по месяцам, в git не входят
   manifest: data/news/gdelt_manifest.csv    # sha256 каждого скачанного дневного архива
   rules: configs/news_rules.yaml
+  types: [disaster]                         # на 2023–2024 работает только ЧС: решения по ставке в GDELT почти не
+                                            # попадают (1 из 8), остальные типы дают лишь ложные совпадения (docs/full_run.md, §3а)
   labeled: data/news/gdelt_labeled.csv
   review: data/news/gdelt_review.csv        # выборка для ручной проверки, колонку check заполняет человек
   review_n: 200

@@ -157,16 +157,19 @@ def cmd_news(cfg, args):
         ev = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
     log.info("записей GDELT: %d", len(ev))
     lab = gdelt.label(ev, gdelt.load_rules(c["rules"]), gdelt.gazetteer(_wide(cfg).index))
+    keep = c.get("types")
+    if keep:
+        lab = lab[lab["type"].isin(keep)].reset_index(drop=True)
     Path(c["labeled"]).parent.mkdir(parents=True, exist_ok=True)
     lab.to_csv(c["labeled"], index=False)
     rp = Path(c["review"])
     if rp.exists():
-        stats = gdelt.review_stats(pd.read_csv(rp, dtype=str))
+        stats = gdelt.review_stats(pd.read_csv(rp, dtype=str, encoding="utf-8-sig"))
         if len(stats):
             stats.to_csv(out_dir(cfg) / "news_review_stats.csv", index=False)
             print(stats.to_string(index=False))
     else:
-        gdelt.review_sample(lab, c["review_n"], cfg["seed"]).to_csv(rp, index=False)
+        gdelt.review_sample(lab, c["review_n"], cfg["seed"]).to_csv(rp, index=False, encoding="utf-8-sig")  # открывается в Excel
         log.info("выборка для ручной проверки: %s", rp)
     reg = events.load_registry(cfg["events"]["registry"], only_verified=False)
     rec = gdelt.registry_recall(lab, reg, c["recall_window_days"])
