@@ -177,6 +177,10 @@ def label(ev: pd.DataFrame, rules: dict, gaz: pd.DataFrame) -> pd.DataFrame:
                 mc &= mu
             m |= mc
             why = why.mask(mc & (why == ""), "cameo")
+        if r.get("url_require"):          # обязательный контекст в адресе: отсекает чужие страны
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                m &= url.str.contains(r["url_require"], regex=True)
         sub = df[m].assign(type=typ, rule=why[m], expected_sign=r.get("expected_sign", "unclear"),
                            scope_rule=r.get("scope", "auto"))
         hits.append(sub)

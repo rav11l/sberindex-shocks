@@ -3,22 +3,28 @@
 # обычно транслит заголовка (ria.ru/20240408/evakuatsiya-...), у зарубежных — английский.
 # cameo_codes — коды событий CAMEO; cameo_requires_url: true — код засчитывается только вместе с url_regex.
 # expected_sign — ожидаемый знак влияния на безналичные расходы жителей.
+# url_require — регулярное выражение, которое тоже должно встретиться в адресе (контекст России):
+#   без него геокодер GDELT относит к России британские и американские новости об ипотеке.
 # scope: national — новость всегда федеральная; auto — по геопривязке места события.
 version: 1
 types:
   key_rate:
+    url_require: "russia|russian|rossi|rf-|cbr|bank-of-russia|moscow|kremlin|putin|\\.ru/"
     scope: national
     expected_sign: negative
     url_regex: "klyuchev\\w*-stavk|klyuchevuyu-stavku|key-rate|keyrate|interest-rate|bank-of-russia-(raise|hike|cut)|tsb-(povysil|snizil)|cbr-(raise|hike)"
   mortgage_rules:
+    url_require: "russia|russian|rossi|rf-|cbr|bank-of-russia|moscow|kremlin|putin|\\.ru/"
     scope: national
     expected_sign: negative
     url_regex: "lgotn\\w*-ipotek|ipotek|mortgage"
   tariff:
+    url_require: "russia|russian|rossi|rf-|cbr|bank-of-russia|moscow|kremlin|putin|\\.ru/"
     scope: auto
     expected_sign: negative
     url_regex: "tarif\\w*-zhkh|kommunaln\\w*-tarif|indeksats\\w*-tarif|utility-(tariff|price|bill)"
   social_payment:
+    url_require: "russia|russian|rossi|rf-|cbr|bank-of-russia|moscow|kremlin|putin|\\.ru/"
     scope: auto
     expected_sign: positive
     url_regex: "vyplat|posobi|materinsk\\w*-kapital|indeksats\\w*-pensi|pension-(increase|indexation)"
@@ -29,6 +35,7 @@ types:
     cameo_codes: ["0233", "073"]      # призыв к гуманитарной помощи; оказание гуманитарной помощи
     cameo_requires_url: true
   trade_restriction:
+    url_require: "russia|russian|rossi|rf-|cbr|bank-of-russia|moscow|kremlin|putin|\\.ru/"
     scope: auto
     expected_sign: negative
     url_regex: "zapret\\w*-prodazh|ogranichen\\w*-prodazh|sales-ban|alcohol-ban"
