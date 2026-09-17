@@ -35,8 +35,24 @@ Run $vpy @("-m", "pip", "install", "-r", "requirements.txt")
 if (-not $NewsOnly) { Run $vpy @("-m", "pip", "install", "-r", "requirements-foundation.txt") }
 Run $vpy @("-m", "pip", "install", "-e", ".", "--no-deps")
 
-Step "Данные СберИндекса (скачивание и сверка sha256)"
-Run $vpy @("-m", "sshocks.cli", "data", "--download")
+Step "Данные СберИндекса (сверка sha256)"
+$raw = "data\raw\sberindex_mo_spending.parquet"
+$local = "..\sberindex_mo_spending.parquet"
+if (-not (Test-Path $raw) -and (Test-Path $local)) {
+    New-Item -ItemType Directory -Force data\raw | Out-Null
+    Copy-Item $local $raw
+    Write-Host "взята выгрузка из папки SberIndex"
+}
+if (Test-Path $raw) {
+    Run $vpy @("-m", "sshocks.cli", "data")
+} else {
+    # если скачивание падает с CERTIFICATE_VERIFY_FAILED: скачайте parquet в браузере
+    # (https://sberindex.ru/api/dataset/v1/download/potrebitelskie-beznalicnye-rashody-na-urovne-munizipalnyh-obrazovanij/parquet)
+    # и положите в data\raw\sberindex_mo_spending.parquet
+    Run $vpy @("-m", "sshocks.cli", "data", "--download")
+}
+$h = (Get-FileHash $raw -Algorithm SHA256).Hash.ToLower()
+if ($h -ne "dbe07d6a3a974ab4fd13258a36382a3b056aa35d12ed6c2b132ae5775115e0f1") { throw "sha256 выгрузки не совпадает с data\hashes.json: $h" }
 
 $pack = @()
 if (-not $NewsOnly) {

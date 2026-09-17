@@ -45,6 +45,17 @@ def verify_hashes(raw_dir: str | Path, hashes_file: str | Path) -> dict:
     return status
 
 
+def _use_system_certificates() -> None:
+    """sberindex.ru подписан корневым сертификатом Минцифры, которого нет в наборе certifi.
+    truststore переключает проверку на хранилище сертификатов ОС (Windows, macOS, Linux);
+    если сертификат установлен в системе, загрузка проходит без отключения проверки."""
+    try:
+        import truststore
+        truststore.inject_into_ssl()
+    except ImportError:
+        pass
+
+
 def download(raw_dir: str | Path, fmt: str = "parquet") -> Path:
     """Скачивает выгрузку через публичный API сайта. Нужен заголовок RqUID (UUID)."""
     import urllib.request
@@ -52,6 +63,7 @@ def download(raw_dir: str | Path, fmt: str = "parquet") -> Path:
     raw_dir = Path(raw_dir)
     raw_dir.mkdir(parents=True, exist_ok=True)
     url = f"{API_BASE}/download/{DATASET_ID}/{fmt}"
+    _use_system_certificates()
     req = urllib.request.Request(url, headers={"RqUID": uuid.uuid4().hex, "User-Agent": "sberindex-shocks"})
     name = "sberindex_mo_spending.parquet" if fmt == "parquet" else "sberindex_mo_spending.csv.zip"
     out = raw_dir / name
