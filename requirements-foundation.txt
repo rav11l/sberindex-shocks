@@ -1,4 +1,7 @@
 # Модели-основы: необязательно, нужен доступ к huggingface.co для весов.
-# Версии фиксируются после первого прогона на машине с доступом к весам.
-torch>=2.2
-chronos-forecasting>=1.5
+# Версии зафиксированы по прогону 17.09.2026 (Windows 11, Python 3.12, CPU), см. docs/full_run.md.
+torch==2.14.0
+chronos-forecasting==2.3.2
+transformers==5.17.0
+accelerate==1.15.0
+huggingface_hub==1.32.0
