@@ -59,3 +59,66 @@ def test_event_features_respect_announce_date(tmp_path):
     after = events.event_features(reg, idx, pd.Timestamp("2024-08-01"), pd.Timestamp("2024-09-01"))
     assert before["ev_nat_target"].iloc[0] == 0
     assert after["ev_nat_target"].iloc[0] == -1
+
+
+def _gdelt_zip(rows):
+    import io, zipfile
+    lines = []
+    for r in rows:
+        f = [""] * 58
+        _gdelt_zip.n = getattr(_gdelt_zip, "n", 0) + 1
+        f[0] = str(_gdelt_zip.n)
+        f[1], f[26], f[28], f[33] = r["date"], r.get("code", "010"), r.get("code", "010")[:2], "3"
+        f[49], f[50], f[51], f[57] = r["gtype"], r["place"], r["cc"], r["url"]
+        lines.append("\t".join(f))
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("x.export.CSV", "\n".join(lines))
+    return b.getvalue()
+
+
+def test_gdelt_parse_label_recall():
+    import pandas as pd
+    from sshocks.news import gdelt
+    from sshocks import events
+    blob = _gdelt_zip([
+        {"date": "20240406", "gtype": "4", "place": "Orsk, Orenburg, Russia", "cc": "RS",
+         "url": "https://ria.ru/20240406/proryv-damby-orsk-1938.html"},
+        {"date": "20240406", "gtype": "4", "place": "Orsk, Orenburg, Russia", "cc": "RS",
+         "url": "https://ria.ru/20240406/proryv-damby-orsk-1938.html"},          # дубликат ссылки
+        {"date": "20240726", "gtype": "1", "place": "Russia", "cc": "RS",
+         "url": "https://www.interfax.ru/business/972/klyuchevuyu-stavku-povysili"},
+        {"date": "20240410", "gtype": "4", "place": "Berlin, Germany", "cc": "GM", "url": "https://x.de/flood"},
+        {"date": "20240410", "gtype": "4", "place": "Sovetsk, Russia", "cc": "RS", "url": "https://x.ru/navodnenie"},
+    ])
+    ev = gdelt._parse(blob, "RS")
+    assert len(ev) == 4
+    sids = pd.Index(["Все категории|городской округ город Орск|0", "Все категории|городской округ Советск|0",
+                     "Все категории|Советский муниципальный район|0", "Все категории|городской округ Советск|1",
+                     "Все категории|муниципальный округ город Советск|0"])
+    gaz = gdelt.gazetteer(sids)
+    assert gdelt.city_of_mo("городской округ город Орск") == "Орск"
+    assert gdelt.city_of_mo("Советский муниципальный район") is None
+    lab = gdelt.label(ev, gdelt.load_rules("configs/news_rules.yaml"), gaz)
+    orsk = lab[lab["type"] == "disaster"]
+    assert (orsk["scope"] == "mo").sum() == 1 and orsk["mo"].dropna().iloc[0] == "городской округ город Орск"
+    assert lab[lab["place"].str.startswith("Sovetsk")]["scope"].eq("unmatched").all()   # одноимённые МО
+    assert lab[lab["type"] == "key_rate"]["scope"].eq("national").all()
+    reg = events.load_registry("data/events/registry.csv")
+    rec = gdelt.registry_recall(lab, reg).set_index("event_id")
+    assert rec.loc["E101", "found"] and rec.loc["E005", "found"] and not rec.loc["E102", "found"]
+
+
+def test_gdelt_fetch_resumes(tmp_path, monkeypatch):
+    import pandas as pd
+    from sshocks.news import gdelt
+    calls = []
+    blob = _gdelt_zip([{"date": "20240101", "gtype": "4", "place": "Orsk, Russia", "cc": "RS", "url": "u"}])
+    monkeypatch.setattr(gdelt, "_get", lambda url: calls.append(url) or (None if "20240102" in url else
+                        _gdelt_zip([{"date": url[-25:-17], "gtype": "4", "place": "Orsk, Russia", "cc": "RS", "url": "u"}])))
+    ev = gdelt.fetch("2024-01-01", "2024-02-01", tmp_path / "raw", tmp_path / "m.csv")
+    assert len(calls) == 32 and len(ev) == 31
+    man = pd.read_csv(tmp_path / "m.csv", dtype=str)
+    assert len(man) == 32 and man["sha256"].str.len().fillna(0).astype(int).max() == 64
+    gdelt.fetch("2024-01-01", "2024-02-01", tmp_path / "raw", tmp_path / "m.csv")
+    assert len(calls) == 32            # повторный запуск ничего не качает

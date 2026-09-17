@@ -13,7 +13,21 @@ data:
 
 events:
   registry: data/events/registry.csv
-  only_verified: false                      # в финальном прогоне — true
+  only_verified: true                       # в модели идут только события со ссылкой на первоисточник
+
+news:                                       # новостной поток: GDELT 1.0, разметка правилами (без языковых моделей)
+  source: gdelt_v1_events
+  start: "2023-01-01"
+  end: "2024-12-31"
+  country: RS                               # код FIPS места события
+  raw_dir: data/raw/gdelt                   # отфильтрованные записи по месяцам, в git не входят
+  manifest: data/news/gdelt_manifest.csv    # sha256 каждого скачанного дневного архива
+  rules: configs/news_rules.yaml
+  labeled: data/news/gdelt_labeled.csv
+  review: data/news/gdelt_review.csv        # выборка для ручной проверки, колонку check заполняет человек
+  review_n: 200
+  recall_window_days: 7
+  use_in_models: false                      # включается после ручной проверки точности правил
 
 forecast:
   horizons: [1, 2, 3]

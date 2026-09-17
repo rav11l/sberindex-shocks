@@ -1,10 +1,14 @@
 event_id,announce_date,effective_date,scope,mo_pattern,type,affected_categories,expected_sign,source_url,verified,note
-E001,2023-08-15,2023-08-15,national,,key_rate,all,negative,,no,ключевая ставка 12 %; внеочередное заседание; сверить с пресс-релизом Банка России
-E002,2023-10-27,2023-10-27,national,,key_rate,all,negative,,no,ключевая ставка 15 %; сверить
-E003,2023-12-15,2023-12-15,national,,key_rate,all,negative,,no,ключевая ставка 16 %; сверить
-E004,2024-07-26,2024-07-26,national,,key_rate,all,negative,,no,ключевая ставка 18 %; сверить
-E005,2024-09-13,2024-09-13,national,,key_rate,all,negative,,no,ключевая ставка 19 %; сверить
-E006,2024-10-25,2024-10-25,national,,key_rate,all,negative,,no,ключевая ставка 21 %; сверить
-E007,,2024-07-01,national,,mortgage_rules,all,negative,,no,завершение массовой льготной ипотеки; дату объявления уточнить
-E008,,2024-07-01,national,,tariff,all,negative,,no,индексация коммунальных тарифов; дату объявления и величину уточнить
-E101,2024-04-05,2024-04-01,region,городской округ город Орск|городской округ город Новотроицк|городской округ город Оренбург,disaster_payments,all,positive,,no,прорыв дамбы в Орске и паводок в Оренбургской области; выплаты пострадавшим; даты и перечень МО сверить
+E000,2023-07-21,2023-07-24,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=21072023_133000Key.htm,yes,"ключевая ставка повышена на 100 б.п. до 8,50 %"
+E001,2023-08-15,2023-08-15,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=15082023_103000Key.htm,yes,"внеочередное заседание; ставка повышена на 350 б.п. до 12,00 %"
+E002,2023-09-15,2023-09-18,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=15092023_133000Key.htm,yes,"ставка повышена на 100 б.п. до 13,00 %"
+E003,2023-10-27,2023-10-30,national,,key_rate,all,negative,https://cbr.ru/press/pr/?file=27102023_133000key.htm,yes,"ставка повышена на 200 б.п. до 15,00 %"
+E004,2023-12-15,2023-12-18,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=15122023_133000key.htm,yes,"ставка повышена на 100 б.п. до 16,00 %"
+E005,2024-07-26,2024-07-29,national,,key_rate,all,negative,https://www.cbr.ru/press/PR/?file=26072024_133000Key.htm,yes,"ставка повышена на 200 б.п. до 18,00 %"
+E006,2024-09-13,2024-09-16,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=13092024_133000Key.htm,yes,"ставка повышена на 100 б.п. до 19,00 %"
+E007,2024-10-25,2024-10-28,national,,key_rate,all,negative,https://www.cbr.ru/press/pr/?file=25102024_133000key.htm,yes,"ставка повышена на 200 б.п. до 21,00 %"
+E008,2022-12-29,2024-07-01,national,,mortgage_rules,all,negative,https://www.vedomosti.ru/realty/news/2022/12/29/957561-pravitelstvo-prodlilo-lgotnoi-ipoteki,yes,продление массовой льготной ипотеки до 1 июля 2024 года; дата объявления — публикация решения правительства
+E009,2023-11-10,2024-07-01,national,,tariff,all,negative,http://government.ru/docs/all/150468/,yes,"распоряжение Правительства РФ от 10.11.2023 № 3147-р; индексация платы за коммунальные услуги с 1 июля 2024 года в среднем 9,8 % (Интерфакс 01.07.2024)"
+E101,2024-04-05,2024-04-05,mo,городской округ город Орск,disaster_payments,all,positive,https://www.rbc.ru/society/06/04/2024/661114a49a7947a43895fc12,yes,прорыв дамбы вечером 5 апреля 2024; 6 апреля губернатор объявил двукратное увеличение выплат пострадавшим
+E102,2024-04-08,2024-04-08,mo,городской округ город Новотроицк,disaster_payments,all,positive,https://ria.ru/20240408/evakuatsiya-1938526312.html,yes,перелив воды через дамбу и эвакуация жителей 8 апреля 2024
+E103,2024-04-11,2024-04-11,mo,городской округ город Оренбург,disaster_payments,all,positive,https://lenta.ru/articles/2024/04/11/orenburg/,partial,паводок в Оренбурге в апреле 2024; точная дата подтопления и перечень районов уточнить по сводкам МЧС

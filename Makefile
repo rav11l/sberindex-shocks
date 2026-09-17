@@ -7,6 +7,7 @@ data:         ; $(PY) -m sshocks.cli data --config $(CFG)
 forecast:     ; $(PY) -m sshocks.cli forecast --config $(CFG)
 changepoint:  ; $(PY) -m sshocks.cli changepoint --config $(CFG)
 figures:      ; $(PY) -m sshocks.cli figures --config $(CFG)
+news:         ; $(PY) -m sshocks.cli news --download --config $(CFG)
 all:          ; $(PY) -m sshocks.cli all --config $(CFG)
 test:         ; $(PY) -m pytest -q tests
-.PHONY: install download data forecast changepoint figures all test
+.PHONY: install download data forecast changepoint figures news all test

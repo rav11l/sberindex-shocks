@@ -110,14 +110,16 @@ def bocpd(d: pd.DataFrame, eval_cols, hazard: float = 1 / 24, threshold: float =
         sigma2 = _robust_scale(hist) ** 2
         mu0, tau2 = np.median(hist), max(np.var(hist), sigma2)
         # апостериорные параметры для каждой длины пробега
-        R = np.array([1.0])
+        logR = np.array([0.0])
         mu = np.array([mu0])
         prec = np.array([1 / tau2])
         for j in range(first[0], len(cols)):
             if np.isnan(x[j]):
                 continue
             pvar = 1 / prec + sigma2
-            pred = np.exp(-0.5 * (x[j] - mu) ** 2 / pvar) / np.sqrt(2 * np.pi * pvar)
+            # весь пересчёт в логарифмах: при сильном выбросе и узкой дисперсии произведение R * pred
+            # обнуляется у всех длин пробега, и R становился NaN до конца ряда
+            logp = -0.5 * (x[j] - mu) ** 2 / pvar - 0.5 * np.log(2 * np.pi * pvar)
             # cp-масса, рождённая на шаге j, оценивает x_{j+1} уже как новый режим, поэтому
             # ожидаемое событие месяца j+1 повышает интенсивность на шаге j
             hz = hazard
@@ -125,10 +127,11 @@ def bocpd(d: pd.DataFrame, eval_cols, hazard: float = 1 / 24, threshold: float =
             if event_hazard is not None and nxt is not None and nxt in event_hazard.columns:
                 if event_hazard.iat[i, event_hazard.columns.get_loc(nxt)] > 0:
                     hz = min(0.9, hazard * event_boost)
-            growth = R * pred * (1 - hz)
-            cp = (R * pred * hz).sum()
-            R = np.append(cp, growth)
-            R /= R.sum()
+            lj = logR + logp
+            lcp = np.logaddexp.reduce(lj) + np.log(hz)
+            logR = np.append(lcp, lj + np.log1p(-hz))
+            logR -= np.logaddexp.reduce(logR)
+            R = np.exp(logR)
             new_prec = prec + 1 / sigma2
             new_mu = (mu * prec + x[j] / sigma2) / new_prec
             mu = np.append(mu0, new_mu)

@@ -5,6 +5,8 @@
   forecast     скользящий бэктест прогнозных моделей
   changepoint  полусинтетическая проверка детекторов и реальные события
   figures      рисунки для отчёта
+  news         GDELT: загрузка (--download), разметка правилами, выборка для ручной проверки
+  merge        объединение прогнозов из нескольких каталогов (--inputs)
   all          всё по порядку
 """
 from __future__ import annotations
@@ -119,6 +121,60 @@ def cmd_changepoint(cfg, args):
     return res
 
 
+def cmd_merge(cfg, args):
+    """Объединяет прогнозы из нескольких каталогов (например, облачный прогон и модели-основы)."""
+    frames = []
+    for d in args.inputs:
+        p = Path(d) / "forecast_predictions.parquet"
+        df = pd.read_parquet(p)
+        df["source"] = d
+        frames.append(df)
+        log.info("%s: %s", d, sorted(df["model"].unique()))
+    pred = pd.concat(frames, ignore_index=True)
+    # модель, посчитанная в нескольких каталогах (например, snaive), берётся из первого
+    pred = pred.drop_duplicates(subset=["model", "origin", "h", "series_id"], keep="first").drop(columns="source")
+    o = out_dir(cfg)
+    pred.to_parquet(o / "forecast_predictions.parquet")
+    m = backtest.metrics(pred)
+    mh = backtest.metrics(pred, by=("model", "h"))
+    m.to_csv(o / "forecast_metrics.csv", index=False)
+    mh.to_csv(o / "forecast_metrics_by_h.csv", index=False)
+    if "prophet" in set(pred["model"]):
+        pd.DataFrame([backtest.dm_test(pred, a, "prophet") for a in m["model"] if a != "prophet"]).to_csv(
+            o / "forecast_dm_vs_prophet.csv", index=False)
+    print(m.sort_values("MAE").to_string(index=False))
+
+
+def cmd_news(cfg, args):
+    from .news import gdelt
+    c = cfg["news"]
+    if args.download:
+        ev = gdelt.fetch(c["start"], c["end"], c["raw_dir"], c["manifest"], c.get("country", "RS"))
+    else:
+        files = sorted(Path(c["raw_dir"]).glob("gdelt_events_*.parquet"))
+        if not files:
+            raise SystemExit(f"нет выгрузки GDELT в {c['raw_dir']}: запустите news --download")
+        ev = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
+    log.info("записей GDELT: %d", len(ev))
+    lab = gdelt.label(ev, gdelt.load_rules(c["rules"]), gdelt.gazetteer(_wide(cfg).index))
+    Path(c["labeled"]).parent.mkdir(parents=True, exist_ok=True)
+    lab.to_csv(c["labeled"], index=False)
+    rp = Path(c["review"])
+    if rp.exists():
+        stats = gdelt.review_stats(pd.read_csv(rp, dtype=str))
+        if len(stats):
+            stats.to_csv(out_dir(cfg) / "news_review_stats.csv", index=False)
+            print(stats.to_string(index=False))
+    else:
+        gdelt.review_sample(lab, c["review_n"], cfg["seed"]).to_csv(rp, index=False)
+        log.info("выборка для ручной проверки: %s", rp)
+    reg = events.load_registry(cfg["events"]["registry"], only_verified=False)
+    rec = gdelt.registry_recall(lab, reg, c["recall_window_days"])
+    rec.to_csv(out_dir(cfg) / "news_registry_recall.csv", index=False)
+    print(lab.groupby(["type", "scope"]).size().to_string())
+    print(rec.to_string(index=False))
+
+
 def cmd_figures(cfg, args):
     from . import figures
     figures.make_all(cfg)
@@ -126,10 +182,11 @@ def cmd_figures(cfg, args):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="sshocks")
-    ap.add_argument("command", choices=["data", "forecast", "changepoint", "figures", "all"])
+    ap.add_argument("command", choices=["data", "forecast", "changepoint", "figures", "news", "merge", "all"])
     ap.add_argument("--config", default="configs/default.yaml")
     ap.add_argument("--set", nargs="*", default=[], help="переопределение ключей: forecast.max_series=200")
     ap.add_argument("--download", action="store_true")
+    ap.add_argument("--inputs", nargs="*", default=[], help="каталоги для merge")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     cfg = load_cfg(args.config, args.set)

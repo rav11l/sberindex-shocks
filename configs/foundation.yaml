@@ -1,0 +1,29 @@
+# Прогон моделей-основ на машине с доступом к huggingface.co.
+# Тот же набор рядов и точек, что в default.yaml; snaive нужен как общая база для rel_MAE.
+# Запуск:  python -m sshocks.cli forecast --config configs/foundation.yaml
+# Результат: outputs_foundation/forecast_predictions.parquet — объединяется с основным прогоном
+#            командой  python -m sshocks.cli merge --inputs outputs outputs_foundation
+seed: 42
+output_dir: outputs_foundation
+
+data:
+  raw_dir: data/raw
+  file: sberindex_mo_spending.parquet
+  hashes: data/hashes.json
+  download_if_missing: true
+  category: Все категории
+  min_obs: 24
+
+events:
+  registry: data/events/registry.csv
+  only_verified: true
+
+forecast:
+  horizons: [1, 2, 3]
+  origins: ["2024-06-01", "2024-07-01", "2024-08-01", "2024-09-01"]
+  max_series: null
+  models:
+    snaive:        {}
+    chronos:       {checkpoint: amazon/chronos-bolt-small, mode: relative}
+    chronos_level: {fn: chronos, checkpoint: amazon/chronos-bolt-small, mode: level}
+    chronos_base:  {fn: chronos, checkpoint: amazon/chronos-bolt-base, mode: relative}

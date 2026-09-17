@@ -7,3 +7,4 @@ data/raw/*
 !data/raw/.gitkeep
 outputs*/
 !outputs/README.md
+results_local*

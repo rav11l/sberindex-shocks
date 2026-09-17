@@ -1,0 +1,34 @@
+# Правила разметки новостного потока GDELT (§5.2 дизайна). Языковые модели не используются.
+# url_regex проверяется по ссылке на статью в нижнем регистре: у российских СМИ в адресе
+# обычно транслит заголовка (ria.ru/20240408/evakuatsiya-...), у зарубежных — английский.
+# cameo_codes — коды событий CAMEO; cameo_requires_url: true — код засчитывается только вместе с url_regex.
+# expected_sign — ожидаемый знак влияния на безналичные расходы жителей.
+# scope: national — новость всегда федеральная; auto — по геопривязке места события.
+version: 1
+types:
+  key_rate:
+    scope: national
+    expected_sign: negative
+    url_regex: "klyuchev\\w*-stavk|klyuchevuyu-stavku|key-rate|keyrate|interest-rate|bank-of-russia-(raise|hike|cut)|tsb-(povysil|snizil)|cbr-(raise|hike)"
+  mortgage_rules:
+    scope: national
+    expected_sign: negative
+    url_regex: "lgotn\\w*-ipotek|ipotek|mortgage"
+  tariff:
+    scope: auto
+    expected_sign: negative
+    url_regex: "tarif\\w*-zhkh|kommunaln\\w*-tarif|indeksats\\w*-tarif|utility-(tariff|price|bill)"
+  social_payment:
+    scope: auto
+    expected_sign: positive
+    url_regex: "vyplat|posobi|materinsk\\w*-kapital|indeksats\\w*-pensi|pension-(increase|indexation)"
+  disaster:
+    scope: auto
+    expected_sign: positive          # выплаты пострадавшим; прямой ущерб даёт обратный знак, это проверяется в отчёте
+    url_regex: "navodnen|pavod|zatoplen|podtoplen|proryv-damb|dambu|evakuats|flood|dam-(burst|breach)|evacuat"
+    cameo_codes: ["0233", "073"]      # призыв к гуманитарной помощи; оказание гуманитарной помощи
+    cameo_requires_url: true
+  trade_restriction:
+    scope: auto
+    expected_sign: negative
+    url_regex: "zapret\\w*-prodazh|ogranichen\\w*-prodazh|sales-ban|alcohol-ban"
