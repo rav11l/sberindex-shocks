@@ -1,5 +1,7 @@
-# Локальный прогон на Windows: модели-основы Chronos и (по желанию) загрузка новостей GDELT.
+﻿# Локальный прогон на Windows: модели-основы Chronos и (по желанию) загрузка новостей GDELT.
 # Нужны Python 3.11 или 3.12 и доступ к sberindex.ru, huggingface.co и data.gdeltproject.org.
+#
+# Файл сохранён в UTF-8 с BOM: без BOM Windows PowerShell 5.1 читает его в cp1251 и ломает кириллицу.
 #
 # Запуск из корня репозитория:
 #   powershell -ExecutionPolicy Bypass -File scripts\run_local.ps1            # только Chronos
@@ -12,6 +14,7 @@ param([switch]$News, [switch]$NewsOnly)
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $env:PYTHONUTF8 = "1"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Step($t) { Write-Host "`n=== $t ===" -ForegroundColor Cyan }
 function Run($exe, [string[]]$a) { & $exe @a; if ($LASTEXITCODE -ne 0) { throw "ошибка: $exe $($a -join ' ')" } }
