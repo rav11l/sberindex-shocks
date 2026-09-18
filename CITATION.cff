@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "Если вы используете этот код или результаты, сошлитесь на работу так."
 title: "Шок по расписанию: прогноз потребительских расходов муниципалитетов и раннее обнаружение структурных сдвигов по данным СберИндекса"
-version: 0.1.0
+version: 0.1.1
 date-released: "2026-09-18"
 license: MIT
 repository-code: "https://github.com/rav11l/sberindex-shocks"

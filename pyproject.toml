@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sberindex-shocks"
-version = "0.1.0"
+version = "0.1.1"
 description = "Прогноз потребительских расходов МО и раннее обнаружение структурных сдвигов по данным СберИндекса"
 authors = [{name = "Ravil Akhtyamov"}]
 requires-python = ">=3.10"
