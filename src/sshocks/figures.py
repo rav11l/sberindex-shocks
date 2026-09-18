@@ -14,6 +14,7 @@ from . import data
 from .changepoint.detectors import transform
 
 INK, MUTED, ACCENT, GRID = "#1f2328", "#6e7781", "#0b6e4f", "#d0d7de"
+SERIES = ["#0b6e4f", "#1f6feb", "#bc4c00", "#8250df", "#57606a", "#a40e26"]
 
 
 def _style(ax):
@@ -103,4 +104,67 @@ def make_all(cfg):
         _style(ax)
         fig.tight_layout()
         fig.savefig(fig_dir / "04_orenburg_case.png", dpi=160)
+        plt.close(fig)
+
+    # 5. Кривые точность–полнота по порогам детекторов
+    p = o / "changepoint_sweep.csv"
+    if p.exists():
+        sw = pd.read_csv(p)
+        fig, ax = plt.subplots(figsize=(5.4, 3.8))
+        for i, (det, g) in enumerate(sw.groupby("detector")):
+            g = g.sort_values("recall")
+            ax.plot(g["recall"], g["precision"], marker="o", ms=3, lw=1.4,
+                    color=SERIES[i % len(SERIES)], label=det)
+        ax.set_xlabel("полнота", color=MUTED, fontsize=8)
+        ax.set_ylabel("точность", color=MUTED, fontsize=8)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_title("Детекторы: кривые по порогу", loc="left", fontsize=10, color=INK)
+        ax.legend(frameon=False, fontsize=7)
+        _style(ax)
+        fig.tight_layout()
+        fig.savefig(fig_dir / "05_detector_curves.png", dpi=160)
+        plt.close(fig)
+
+    # 6. Ошибка по группам размера МО: ансамбль против базовой модели
+    p = o / "analysis_by_size.csv"
+    if p.exists():
+        by = pd.read_csv(p)
+        show = [m for m in ["ens3_mean", "chronos_base", "ets_relative", "snaive_growth", "prophet"]
+                if m in set(by["model"])]
+        fig, ax = plt.subplots(figsize=(6.4, 3.4))
+        groups = sorted(by["size_group"].unique())
+        xs = np.arange(len(groups))
+        wbar = 0.8 / max(1, len(show))
+        for i, m in enumerate(show):
+            v = by[by["model"] == m].set_index("size_group").reindex(groups)["MAE_pct_of_level"]
+            ax.bar(xs + i * wbar, v, wbar, label=m, color=SERIES[i % len(SERIES)])
+        ax.set_xticks(xs + wbar * (len(show) - 1) / 2, groups)
+        ax.set_ylabel("MAE, % от уровня расходов группы", color=MUTED, fontsize=8)
+        ax.set_title("Ошибка по группам МО: Q1 — малые, Q5 — крупные", loc="left", fontsize=10, color=INK)
+        ax.legend(frameon=False, fontsize=7, ncol=2)
+        _style(ax)
+        fig.tight_layout()
+        fig.savefig(fig_dir / "06_by_size.png", dpi=160)
+        plt.close(fig)
+
+    # 7. Событийный анализ паводков: сдвиг затронутых МО на фоне остальных
+    p = o / "event_study.csv"
+    if p.exists():
+        es = pd.read_csv(p)
+        d_all = transform(wide) * 100
+        pre = d_all.loc[:, "2024-01-01":"2024-03-01"].mean(axis=1)
+        post = d_all.loc[:, "2024-04-01":"2024-06-01"].mean(axis=1)
+        shift = (post - pre).drop(es["series_id"], errors="ignore")
+        fig, ax = plt.subplots(figsize=(6.4, 3.4))
+        ax.hist(shift, bins=60, color=GRID, label="остальные МО")
+        for _, r in es.iterrows():
+            ax.axvline(r["shift_pp"], color=ACCENT, lw=1.2, alpha=0.85)
+        ax.axvline(np.nan, color=ACCENT, lw=1.2, label="МО из реестра ЧС")
+        ax.set_xlabel("сдвиг прироста г/г, п. п. (апр.–июнь минус янв.–март)", color=MUTED, fontsize=8)
+        ax.set_title("Паводки весны 2024: затронутые МО на фоне остальных", loc="left", fontsize=10, color=INK)
+        ax.legend(frameon=False, fontsize=7)
+        _style(ax)
+        fig.tight_layout()
+        fig.savefig(fig_dir / "07_event_study.png", dpi=160)
         plt.close(fig)
