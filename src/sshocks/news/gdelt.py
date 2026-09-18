@@ -206,6 +206,9 @@ def label(ev: pd.DataFrame, rules: dict, gaz: pd.DataFrame) -> pd.DataFrame:
                           np.where(lab["scope"].eq("mo"), "^" + lab["mo"].fillna("").map(re.escape) + "$", ""))
     lab["n_articles"] = pd.to_numeric(lab["NumArticles"], errors="coerce").fillna(1)
     # одна статья = одна новость данного типа: дубликаты по ссылке схлопываются
+    deny = set(rules.get("deny_urls", []))
+    if deny:                              # решения ручной проверки: адреса, отвергнутые человеком
+        lab = lab[~lab["SOURCEURL"].isin(deny)]
     lab = (lab.sort_values("n_articles", ascending=False)
               .drop_duplicates(["SOURCEURL", "type"])
               .rename(columns={"SOURCEURL": "source_url", "ActionGeo_FullName": "place"}))

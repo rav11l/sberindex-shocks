@@ -42,3 +42,9 @@ types:
     scope: auto
     expected_sign: negative
     url_regex: "zapret\\w*-prodazh|ogranichen\\w*-prodazh|sales-ban|alcohol-ban"
+
+# Список исключений по итогам ручной проверки выборки (18.09.2026): адреса статей, которые
+# правила отнесли к ЧС ошибочно. Каждая строка — решение человека, а не эвристика.
+deny_urls:
+  - "https://www.brecorder.com/news/40283030/fear-is-always-present-russian-city-evacuates-hundreds-of-children"   # эвакуация детей из приграничного города, военный сюжет
+  - "https://www.rte.ie/news/world/2024/0809/1464160-russia-evacuation/"                                            # эвакуация в Курской области, военный сюжет
