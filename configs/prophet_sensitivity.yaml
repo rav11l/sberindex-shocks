@@ -26,7 +26,7 @@ forecast:
     prophet:         {yearly_fourier: 3}                                   # наша конфигурация
     p_fourier1:      {fn: prophet, yearly_fourier: 1}
     p_fourier5:      {fn: prophet, yearly_fourier: 5}
-    p_fourier10:     {fn: prophet, yearly_fourier: 10}
+    # p_fourier10 (10 гармоник) исключена: на 24 точках модель вырождена, подгонка идёт в десятки раз дольше
     p_mult:          {fn: prophet, yearly_fourier: 3, seasonality_mode: multiplicative}
     p_cps001:        {fn: prophet, yearly_fourier: 3, changepoint_prior_scale: 0.01}
     p_cps05:         {fn: prophet, yearly_fourier: 3, changepoint_prior_scale: 0.5}
