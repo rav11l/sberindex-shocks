@@ -226,6 +226,54 @@ def event_study(wide: pd.DataFrame, truth: pd.DataFrame, pre: tuple[str, str], p
     return tab, summary
 
 
+def is_city(mo: str) -> bool:
+    """Городской округ против района: разделение по типу МО, а не по списку названий."""
+    return mo.startswith("городской округ") or mo.startswith("муниципальный округ город")
+
+
+def event_study_by_category(long: pd.DataFrame, cfg: dict, reg: pd.DataFrame, pre, post) -> pd.DataFrame:
+    """Событийный анализ по каждой категории расходов и по типу МО.
+
+    Два разреза нужны по разным причинам. По категориям проверяется гипотеза «выплаты гасят ущерб»:
+    если она верна, знаки по категориям должны расходиться. По типу МО — качество привязки: города
+    названы в первоисточниках поимённо, а районы попадают под событие через региональный режим ЧС,
+    то есть их привязка заведомо грубее.
+    """
+    from scipy import stats
+
+    from .. import data as data_mod
+    from .. import events as events_mod
+
+    rows = []
+    for cat in sorted(long["category"].unique()):
+        wide = data_mod.panel(long, cat, min_obs=cfg["data"]["min_obs"])
+        if wide.empty:
+            continue
+        truth = events_mod.truth_changepoints(reg, wide.index)
+        if truth.empty:
+            continue
+        tab, summary = event_study(wide, truth, pre, post)
+        r = summary.iloc[0].to_dict()
+        r.update({"category": cat, "group": "все затронутые"})
+        rows.append(r)
+        tab = tab.assign(mo=tab["series_id"].str.split("|").str[1])
+        for name, mask in [("города", tab["mo"].map(is_city)), ("районы", ~tab["mo"].map(is_city))]:
+            part = tab[mask]
+            if len(part) < 3:
+                continue
+            t, p = stats.ttest_1samp(part["shift_pp"], summary.iloc[0]["mean_other_pp"])
+            rows.append({"category": cat, "group": name, "n_affected": len(part),
+                         "mean_affected_pp": part["shift_pp"].mean(),
+                         "median_affected_pp": part["shift_pp"].median(),
+                         "mean_other_pp": summary.iloc[0]["mean_other_pp"],
+                         "diff_pp": part["shift_pp"].mean() - summary.iloc[0]["mean_other_pp"],
+                         "p": p})
+    out = pd.DataFrame(rows)
+    cols = ["category", "group", "n_affected", "mean_affected_pp", "median_affected_pp",
+            "mean_other_pp", "diff_pp", "ci_low_pp", "ci_high_pp", "p", "p_clustered", "mde80_pp"]
+    return out[[c for c in cols if c in out.columns]]
+
+
 def real_events(wide: pd.DataFrame, truth: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """Детекторы на реальных рядах против размеченных локальных событий: месяц первой тревоги."""
     c = cfg["changepoint"]

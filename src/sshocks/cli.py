@@ -124,6 +124,13 @@ def cmd_changepoint(cfg, args):
     tab.to_csv(o / "event_study.csv", index=False)
     summary.to_csv(o / "event_study_summary.csv", index=False)
     print(summary.round(2).to_string(index=False))
+    if c.get("study_categories", True):
+        long = pd.read_parquet(o / "long.parquet") if (o / "long.parquet").exists() else data.load(cfg)
+        by_cat = benchmark.event_study_by_category(long, cfg, reg,
+                                                   tuple(c.get("study_pre", ["2024-01-01", "2024-03-01"])),
+                                                   tuple(c.get("study_post", ["2024-04-01", "2024-06-01"])))
+        by_cat.to_csv(o / "event_study_by_category.csv", index=False)
+        print(by_cat.round(2).to_string(index=False))
     if len(real):
         print(real.to_string(index=False))
     return res
