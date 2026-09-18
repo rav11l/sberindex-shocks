@@ -206,7 +206,12 @@ def cmd_analyze(cfg, args):
     wide = _wide(cfg)
     level = analysis.size_groups(wide)
     have = set(pred["model"])
-    combos = [c for c in cfg.get("analysis", {}).get("ensembles", []) if set(c["members"]) <= have]
+    wanted = cfg.get("analysis", {}).get("ensembles", [])
+    combos = [c for c in wanted if set(c["members"]) <= have]
+    for c in wanted:                       # молча терять ансамбль нельзя: об этом узнают только по таблице
+        if set(c["members"]) - have:
+            log.warning("ансамбль %s пропущен: в прогнозах нет моделей %s", c["name"],
+                        sorted(set(c["members"]) - have))
     parts = [pred]
     for c in combos:
         parts.append(analysis.combine(pred, c["members"], c["name"], c.get("how", "mean")))
@@ -224,6 +229,8 @@ def cmd_analyze(cfg, args):
     if base in set(full["model"]):
         pd.DataFrame([backtest.dm_test(full, a, base) for a in m["model"] if a != base]).to_csv(
             o / "analysis_dm.csv", index=False)
+        pd.DataFrame([backtest.paired_summary(full, a, base) for a in m["model"] if a != base]).to_csv(
+            o / "analysis_paired.csv", index=False)
     print(m.to_string(index=False))
     print(best.to_string(index=False))
     return m

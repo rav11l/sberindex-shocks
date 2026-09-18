@@ -67,10 +67,25 @@ def ets_relative(wide: pd.DataFrame, horizons, panel: pd.DataFrame | None = None
     return pd.DataFrame(out).reindex(wide.index)
 
 
+def factor_only(wide: pd.DataFrame, horizons, panel: pd.DataFrame | None = None, window: int = 3, **_):
+    """Контрольная модель: никакой идиосинкразии, только общий фактор.
+
+    Ряд держит своё последнее отклонение от общего фактора, а сам фактор прогнозируется
+    наивно по среднему приросту. Показывает, сколько точности даёт панель сама по себе,
+    без моделирования отдельного МО.
+    """
+    cf = common_factor(wide, panel)
+    dev_last = np.log(wide.iloc[:, -1]) - cf.iloc[-1]
+    cf_wide = pd.DataFrame([np.exp(cf.values)], columns=wide.columns)
+    cf_fc = snaive_growth(cf_wide, horizons, window=window).iloc[0]
+    return pd.DataFrame({h: np.exp(dev_last) * cf_fc[h] for h in horizons}, index=wide.index)
+
+
 def prophet(wide: pd.DataFrame, horizons, max_series: int | None = None, yearly_fourier: int = 3,
             seed: int = 0, seasonality_mode: str = "additive", changepoint_prior_scale: float = 0.05,
             seasonality_prior_scale: float = 10.0, n_changepoints: int | None = None,
-            growth: str = "linear", log: bool = False, **_):
+            growth: str = "linear", log: bool = False, relative: bool = False,
+            panel: pd.DataFrame | None = None, **_):
     """Prophet на каждом ряду отдельно, как базовая модель в условиях конкурса.
 
     Настройки вынесены в параметры: сравнение с нашей моделью не должно держаться на одной
@@ -79,6 +94,11 @@ def prophet(wide: pd.DataFrame, horizons, max_series: int | None = None, yearly_
     """
     from prophet import Prophet
 
+    cf = None
+    if relative:
+        # Prophet на отклонении от общего фактора: проверка того, что выигрыш даёт приём, а не класс модели
+        cf = common_factor(wide, panel)
+        wide = np.exp(np.log(wide).sub(cf, axis=1))
     logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
     logging.getLogger("prophet").setLevel(logging.ERROR)
     idx = wide.index
@@ -106,7 +126,12 @@ def prophet(wide: pd.DataFrame, horizons, max_series: int | None = None, yearly_
         if log:
             yhat = np.exp(yhat)
         res[sid] = {h: yhat[h - 1] for h in horizons}
-    return pd.DataFrame(res).T.reindex(wide.index)
+    out = pd.DataFrame(res).T.reindex(wide.index)
+    if cf is not None:
+        cf_wide = pd.DataFrame([np.exp(cf.values)], columns=wide.columns)
+        cf_fc = snaive_growth(cf_wide, horizons).iloc[0]
+        out = pd.DataFrame({h: out[h] * cf_fc[h] for h in horizons}, index=out.index)
+    return out
 
 
 REGISTRY = {
@@ -114,4 +139,5 @@ REGISTRY = {
     "snaive_growth": snaive_growth,
     "ets_relative": ets_relative,
     "prophet": prophet,
+    "factor_only": factor_only,
 }

@@ -1,0 +1,49 @@
+# Проверки по итогам разбора судьями (см. docs/audit_2026-09-18.md):
+#   factor_only      — сколько даёт сама панель без моделирования МО;
+#   prophet_relative — тот же приём на базовой модели: дело в приёме или в классе модели;
+#   точки 04–05.2024 — отдельное окно для выбора состава ансамбля, отчёт остаётся на 06–09.
+# Запуск: python -m sshocks.cli forecast --config configs/audit.yaml
+seed: 42
+output_dir: outputs_audit
+
+data:
+  raw_dir: data/raw
+  file: sberindex_mo_spending.parquet
+  hashes: data/hashes.json
+  download_if_missing: false
+  category: Все категории
+  min_obs: 24
+
+events:
+  registry: data/events/registry.csv
+  only_verified: true
+
+forecast:
+  horizons: [1, 2, 3]
+  origins: ["2024-04-01", "2024-05-01", "2024-06-01", "2024-07-01", "2024-08-01", "2024-09-01"]
+  max_series: null
+  models:
+    snaive:           {}
+    snaive_growth:    {window: 3}
+    ets_relative:     {}
+    factor_only:      {}
+    prophet:          {yearly_fourier: 3}
+    prophet_relative: {fn: prophet, yearly_fourier: 3, relative: true}
+
+analysis:
+  size_groups: 5
+  dm_base: prophet
+  ensembles:
+    - {name: ens_ets_snaive, members: [ets_relative, snaive_growth]}
+  switches: []
+
+changepoint:
+  eval_start: "2024-04-01"
+  eval_end: "2024-12-01"
+  max_series: 100
+  repeats: 1
+  share_shocked: 0.5
+  deltas: [-0.10, 0.10]
+  max_delay: 2
+  news_simulation: {recall_news: 0.6, false_news_rate: 0.05}
+  detectors: {cross_section: {k: 3.0}}

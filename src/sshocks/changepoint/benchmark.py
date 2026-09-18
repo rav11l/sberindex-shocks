@@ -41,10 +41,14 @@ def simulate_news(truth: pd.DataFrame, index: pd.Index, columns, eval_cols, reca
                   false_news_rate: float = 0.05, lead: int = 1, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed + 1)
     E = pd.DataFrame(0, index=index, columns=columns)
+    cols = list(columns)
     for _, r in truth.iterrows():
         if rng.random() < recall_news:
-            # новость известна заранее; в детектор она входит на месяц ожидаемого вступления
-            E.loc[r["series_id"], r["tau"]] = 1
+            # новость известна заранее, но дата вступления в силу неточна: помечается окно
+            # [tau - lead, tau]. При lead = 0 это оракул точной даты, и выигрыш завышен.
+            j = cols.index(r["tau"])
+            for k in range(max(0, j - lead), j + 1):
+                E.iloc[E.index.get_loc(r["series_id"]), k] = 1
     clean = index.difference(truth["series_id"])
     for sid in rng.choice(clean, int(len(clean) * false_news_rate), replace=False):
         E.loc[sid, eval_cols[rng.integers(0, len(eval_cols))]] = 1
@@ -52,6 +56,9 @@ def simulate_news(truth: pd.DataFrame, index: pd.Index, columns, eval_cols, reca
 
 
 def score(alarms: pd.DataFrame, truth: pd.DataFrame, max_delay: int = 2) -> dict:
+    """TP считается по рядам (не более одной засчитанной тревоги на ряд), FP — по тревогам:
+    единицы разные, это отмечено в отчёте. recall_random — полнота случайного детектора,
+    дающего тревоги с той же частотой: ориентир, без которого полнота не читается."""
     eval_cols = list(alarms.columns)
     pos = {c: i for i, c in enumerate(eval_cols)}
     t_by = truth.set_index("series_id")
@@ -72,17 +79,22 @@ def score(alarms: pd.DataFrame, truth: pd.DataFrame, max_delay: int = 2) -> dict
                 fn += 1
         else:
             fp += len(hits)
-    n_clean_months = (~alarms.index.isin(truth["series_id"])).sum() * len(eval_cols)
+    clean = alarms.loc[~alarms.index.isin(truth["series_id"])]
+    n_clean_months = clean.shape[0] * len(eval_cols)
+    rate = clean.to_numpy().sum() / max(n_clean_months, 1)     # частота тревог на спокойном ряде
     prec = tp / (tp + fp) if tp + fp else np.nan
     rec = tp / (tp + fn) if tp + fn else np.nan
+    rec_random = 1 - (1 - rate) ** (max_delay + 1)             # полнота случайного детектора той же частоты
     return {
         "TP": tp, "FP": fp, "FN": fn,
         "precision": prec, "recall": rec,
         "F1": 2 * prec * rec / (prec + rec) if prec and rec else 0.0,
+        "recall_random": float(rec_random),
+        "recall_over_random": float(rec / rec_random) if rec_random else np.nan,
         "mean_delay": float(np.mean(delays)) if delays else np.nan,
         "share_delay0": float(np.mean(np.array(delays) == 0)) if delays else np.nan,
         "false_alarms_per_100_clean_months":
-            100 * alarms.loc[~alarms.index.isin(truth["series_id"])].to_numpy().sum() / max(n_clean_months, 1),
+            100 * rate,
     }
 
 
@@ -170,8 +182,11 @@ def at_equal_false_alarms(sweep_res: pd.DataFrame, target: float = 3.0) -> pd.Da
         pick = ok.sort_values("recall", ascending=False).head(1) if len(ok) else \
             g.sort_values("false_alarms_per_100_clean_months").head(1)
         rows.append(pick.iloc[0])
-    out = pd.DataFrame(rows)[["detector", "param", "value", "precision", "recall", "F1",
-                              "false_alarms_per_100_clean_months", "mean_delay"]]
+    out = pd.DataFrame(rows)
+    out["target_met"] = out["false_alarms_per_100_clean_months"] <= target
+    cols = ["detector", "param", "value", "precision", "recall", "recall_random", "recall_over_random",
+            "false_alarms_per_100_clean_months", "target_met", "mean_delay"]
+    out = out[[c for c in cols if c in out.columns]]
     return out.sort_values("recall", ascending=False).reset_index(drop=True)
 
 
@@ -192,10 +207,22 @@ def event_study(wide: pd.DataFrame, truth: pd.DataFrame, pre: tuple[str, str], p
                         "shift_pp": diff.loc[hit].to_numpy()}).sort_values("shift_pp")
     rest = diff.drop(hit)
     t, p = stats.ttest_ind(tab["shift_pp"], rest, equal_var=False)
+    # доверительный интервал разности и минимально обнаружимый эффект: при 15 рядах
+    # незначимость означает «эффект не больше MDE», а не «эффекта нет»
+    se = np.sqrt(tab["shift_pp"].var(ddof=1) / len(tab) + rest.var(ddof=1) / len(rest))
+    crit = stats.t.ppf(0.975, len(tab) - 1)
+    diff = tab["shift_pp"].mean() - rest.mean()
+    mde = (stats.norm.ppf(0.975) + stats.norm.ppf(0.8)) * se
+    # кластеризация по событиям: ряды одного региона не независимы
+    by_event = tab.groupby("event_id")["shift_pp"].mean()
+    t_cl, p_cl = stats.ttest_1samp(by_event, rest.mean()) if len(by_event) >= 3 else (np.nan, np.nan)
     summary = pd.DataFrame([{"n_affected": len(tab), "mean_affected_pp": tab["shift_pp"].mean(),
                              "median_affected_pp": tab["shift_pp"].median(),
                              "mean_other_pp": rest.mean(), "sd_other_pp": rest.std(),
-                             "t": t, "p": p}])
+                             "t": t, "p": p, "diff_pp": diff,
+                             "ci_low_pp": diff - crit * se, "ci_high_pp": diff + crit * se,
+                             "mde80_pp": mde, "n_events": len(by_event),
+                             "t_clustered": t_cl, "p_clustered": p_cl}])
     return tab, summary
 
 

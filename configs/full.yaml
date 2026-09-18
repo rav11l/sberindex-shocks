@@ -1,0 +1,94 @@
+# Конфигурация, которой получены все числа отчёта (report/methodology.md).
+# Цепочка:
+#   python -m sshocks.cli forecast    --config configs/full.yaml     # облачные модели, полная панель
+#   python -m sshocks.cli forecast    --config configs/foundation.yaml   # Chronos на машине с весами
+#   python -m sshocks.cli merge       --config configs/full.yaml --inputs outputs_full outputs_foundation
+#   python -m sshocks.cli analyze     --config configs/full.yaml     # ансамбли и разрез по размеру МО
+#   python -m sshocks.cli changepoint --config configs/full.yaml     # детекторы, реальные события, событийный анализ
+#   python -m sshocks.cli sweep       --config configs/full.yaml     # кривые по порогам
+#   python -m sshocks.cli figures     --config configs/full.yaml
+seed: 42
+output_dir: outputs_full
+
+data:
+  raw_dir: data/raw
+  file: sberindex_mo_spending.parquet
+  hashes: data/hashes.json
+  download_if_missing: false
+  category: Все категории
+  min_obs: 24
+
+events:
+  registry: data/events/registry.csv
+  only_verified: true
+
+news:
+  source: gdelt_v1_events
+  start: "2023-01-01"
+  end: "2024-12-31"
+  country: RS
+  raw_dir: data/raw/gdelt
+  manifest: data/news/gdelt_manifest.csv
+  rules: configs/news_rules.yaml
+  types: [disaster]
+  labeled: data/news/gdelt_labeled.csv
+  review: data/news/gdelt_review.csv
+  review_n: 200
+  recall_window_days: 7
+  use_in_models: false
+
+forecast:
+  horizons: [1, 2, 3]
+  origins: ["2024-06-01", "2024-07-01", "2024-08-01", "2024-09-01"]
+  max_series: null
+  models:
+    snaive:           {}
+    snaive_growth:    {window: 3}
+    factor_only:      {}
+    ets_relative:     {}
+    prophet:          {yearly_fourier: 3}
+    prophet_relative: {fn: prophet, yearly_fourier: 3, relative: true}
+    lgbm:             {use_events: true, min_growth_obs: 3}
+    lgbm_noevents:    {fn: lgbm, use_events: false, min_growth_obs: 3}
+
+analysis:
+  size_groups: 5
+  dm_base: factor_only                      # база сравнения — панель без моделирования МО
+  ensembles:
+    - {name: ens_chronos_snaive, members: [chronos_base, snaive_growth]}
+    - {name: ens3_mean, members: [chronos_base, ets_relative, snaive_growth]}
+    - {name: ens3_median, members: [chronos_base, ets_relative, snaive_growth], how: median}
+    - {name: ens4_mean, members: [chronos_base, chronos, ets_relative, snaive_growth]}
+    - {name: ens_ets_snaive, members: [ets_relative, snaive_growth]}
+    - {name: ens_chronos_ets, members: [chronos_base, ets_relative]}
+  switches:
+    - {name: switch_big_chronos, big: chronos_base, small: ets_relative, q: 0.8}
+
+changepoint:
+  eval_start: "2024-04-01"
+  eval_end: "2024-12-01"
+  max_series: null
+  repeats: 3
+  share_shocked: 0.5
+  deltas: [-0.20, -0.10, -0.05, 0.05, 0.10, 0.20]
+  max_delay: 2
+  news_simulation: {recall_news: 0.6, false_news_rate: 0.05, lead: 1}
+  study_pre:  ["2024-01-01", "2024-03-01"]
+  study_post: ["2024-04-01", "2024-06-01"]
+  fa_target: 3.0
+  sweep_max_series: 1000
+  sweep_repeats: 2
+  sweep:
+    zscore:        {k: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0]}
+    cross_section: {k: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0]}
+    cusum:         {h: [2.0, 3.0, 4.0, 6.0, 8.0, 12.0]}
+    bocpd:         {threshold: [0.2, 0.3, 0.5, 0.7, 0.9]}
+    pelt:          {penalty: [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]}
+    binseg:        {penalty: [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]}
+  detectors:
+    zscore:        {k: 3.0}
+    cross_section: {k: 3.0}
+    cusum:         {k: 0.5, h: 4.0}
+    bocpd:         {hazard: 0.04, threshold: 0.5, use_news: true, event_boost: 6.0}
+    pelt:          {penalty: 3.0, recent: 1}
+    binseg:        {penalty: 3.0, recent: 1}

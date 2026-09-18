@@ -67,7 +67,7 @@ changepoint:
   share_shocked: 0.5
   deltas: [-0.20, -0.10, -0.05, 0.05, 0.10, 0.20]
   max_delay: 2
-  news_simulation: {recall_news: 0.6, false_news_rate: 0.05}
+  news_simulation: {recall_news: 0.6, false_news_rate: 0.05, lead: 1}   # lead: 0 — оракул точной даты; 1 — новость помечает и месяц до события
   study_pre:  ["2024-01-01", "2024-03-01"]  # окна событийного анализа реальных ЧС
   study_post: ["2024-04-01", "2024-06-01"]
   fa_target: 3.0                            # доля ложных тревог, при которой детекторы сравниваются
