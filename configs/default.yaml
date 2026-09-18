@@ -46,6 +46,19 @@ forecast:
     chronos_level: {fn: chronos, checkpoint: amazon/chronos-bolt-small, mode: level, enabled: true}
     timesfm:       {checkpoint: google/timesfm-2.0-500m-pytorch, mode: relative, enabled: false}
 
+analysis:                                   # разборы поверх готовых прогнозов (команда analyze)
+  size_groups: 5                            # квантили среднего уровня расходов за 2023 год
+  dm_base: prophet
+  ensembles:
+    - {name: ens_chronos_ets, members: [chronos_base, ets_relative]}
+    - {name: ens_ets_snaive, members: [ets_relative, snaive_growth]}
+    - {name: ens_chronos_snaive, members: [chronos_base, snaive_growth]}
+    - {name: ens3_mean, members: [chronos_base, ets_relative, snaive_growth]}
+    - {name: ens3_median, members: [chronos_base, ets_relative, snaive_growth], how: median}
+    - {name: ens4_mean, members: [chronos_base, chronos, ets_relative, snaive_growth]}
+  switches:
+    - {name: switch_big_chronos, big: chronos_base, small: ets_relative, q: 0.8}
+
 changepoint:
   eval_start: "2024-04-01"                  # прирост г/г определён с 01.2024, детекторам нужно 3 точки истории
   eval_end: "2024-12-01"
@@ -55,6 +68,18 @@ changepoint:
   deltas: [-0.20, -0.10, -0.05, 0.05, 0.10, 0.20]
   max_delay: 2
   news_simulation: {recall_news: 0.6, false_news_rate: 0.05}
+  study_pre:  ["2024-01-01", "2024-03-01"]  # окна событийного анализа реальных ЧС
+  study_post: ["2024-04-01", "2024-06-01"]
+  fa_target: 3.0                            # доля ложных тревог, при которой детекторы сравниваются
+  sweep_max_series: 1000
+  sweep_repeats: 2
+  sweep:                                    # сетка порогов: детектор -> {параметр: значения}
+    zscore:        {k: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0]}
+    cross_section: {k: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0]}
+    cusum:         {h: [2.0, 3.0, 4.0, 6.0, 8.0, 12.0]}
+    bocpd:         {threshold: [0.2, 0.3, 0.5, 0.7, 0.9]}
+    pelt:          {penalty: [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]}
+    binseg:        {penalty: [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]}
   detectors:
     zscore:        {k: 3.0}
     cross_section: {k: 3.0}

@@ -12,10 +12,15 @@ y_t ← y_t·(1+δ) для t ≥ τ. Вторая половина остаёт�
 """
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 
 from .detectors import REGISTRY, transform
+
+
+log = logging.getLogger(__name__)
 
 
 def inject(wide: pd.DataFrame, eval_cols, deltas, share: float = 0.5, seed: int = 0):
@@ -115,6 +120,83 @@ def run(wide: pd.DataFrame, cfg: dict):
     res = pd.DataFrame(rows).groupby("detector").mean(numeric_only=True).drop(columns="repeat")
     bd = pd.DataFrame(by_delta).groupby(["detector", "delta"]).mean(numeric_only=True).drop(columns="repeat")
     return res.sort_values("F1", ascending=False).reset_index(), bd.reset_index()
+
+
+def sweep(wide: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Кривые точность–полнота: каждый детектор прогоняется по сетке своего порога.
+
+    Сетка задаётся в changepoint.sweep: имя детектора -> {параметр: [значения]}. Результат
+    позволяет сравнивать детекторы при одинаковой доле ложных тревог, а не при произвольных порогах.
+    """
+    c = cfg["changepoint"]
+    grid = c.get("sweep", {})
+    eval_cols = [pd.Timestamp(x) for x in pd.date_range(c["eval_start"], c["eval_end"], freq="MS")]
+    full = wide[wide.notna().all(axis=1)]
+    n = c.get("sweep_max_series") or c.get("max_series")
+    if n:
+        full = full.sample(n=min(n, len(full)), random_state=c.get("seed", 0))
+    rows = []
+    for rep in range(c.get("sweep_repeats", c.get("repeats", 1))):
+        seed = c.get("seed", 0) + rep
+        w_inj, truth = inject(full, eval_cols, c["deltas"], c.get("share_shocked", 0.5), seed)
+        d = transform(w_inj)
+        news = simulate_news(truth, d.index, d.columns, eval_cols, **c.get("news_simulation", {}), seed=seed)
+        for name, axis in grid.items():
+            spec = dict(c["detectors"][name])
+            fn = REGISTRY[spec.get("fn", name)]
+            base = {k: v for k, v in spec.items() if k not in {"enabled", "fn", "use_news"}}
+            (param, values), = axis.items()
+            variants = [("", None)] + ([("+news", news)] if spec.get("use_news") else [])
+            for val in values:
+                for suffix, eh in variants:
+                    kw = {**base, param: val}
+                    if eh is not None:
+                        kw["event_hazard"] = eh
+                    A = fn(d, eval_cols, **kw)
+                    rows.append({"detector": name + suffix, "param": param, "value": val, "repeat": rep,
+                                 **score(A, truth, c.get("max_delay", 2))})
+                    log.info("%s %s=%s: P=%.2f R=%.2f FA=%.1f", name + suffix, param, val,
+                             rows[-1]["precision"], rows[-1]["recall"], rows[-1]["false_alarms_per_100_clean_months"])
+    out = (pd.DataFrame(rows).groupby(["detector", "param", "value"]).mean(numeric_only=True)
+           .drop(columns="repeat").reset_index())
+    return out.sort_values(["detector", "value"])
+
+
+def at_equal_false_alarms(sweep_res: pd.DataFrame, target: float = 3.0) -> pd.DataFrame:
+    """Для каждого детектора — настройка с долей ложных тревог, ближайшей снизу к target."""
+    rows = []
+    for det, g in sweep_res.groupby("detector"):
+        ok = g[g["false_alarms_per_100_clean_months"] <= target]
+        pick = ok.sort_values("recall", ascending=False).head(1) if len(ok) else \
+            g.sort_values("false_alarms_per_100_clean_months").head(1)
+        rows.append(pick.iloc[0])
+    out = pd.DataFrame(rows)[["detector", "param", "value", "precision", "recall", "F1",
+                              "false_alarms_per_100_clean_months", "mean_delay"]]
+    return out.sort_values("recall", ascending=False).reset_index(drop=True)
+
+
+def event_study(wide: pd.DataFrame, truth: pd.DataFrame, pre: tuple[str, str], post: tuple[str, str]):
+    """Сдвиг отклонения прироста г/г от медианы: окно после события минус окно до него.
+
+    Возвращает таблицу по затронутым рядам и сводку со сравнением с остальными МО
+    (тест Уэлча). Это ответ на вопрос «виден ли эффект вообще», отдельно от детекторов.
+    """
+    from scipy import stats
+
+    d = transform(wide) * 100
+    cols = lambda a, b: [c for c in d.columns if pd.Timestamp(a) <= c <= pd.Timestamp(b)]
+    diff = d[cols(*post)].mean(axis=1) - d[cols(*pre)].mean(axis=1)
+    aff = truth.drop_duplicates("series_id").set_index("series_id")
+    hit = aff.index.intersection(diff.index)
+    tab = pd.DataFrame({"series_id": hit, "event_id": aff.loc[hit, "event_id"].to_numpy(),
+                        "shift_pp": diff.loc[hit].to_numpy()}).sort_values("shift_pp")
+    rest = diff.drop(hit)
+    t, p = stats.ttest_ind(tab["shift_pp"], rest, equal_var=False)
+    summary = pd.DataFrame([{"n_affected": len(tab), "mean_affected_pp": tab["shift_pp"].mean(),
+                             "median_affected_pp": tab["shift_pp"].median(),
+                             "mean_other_pp": rest.mean(), "sd_other_pp": rest.std(),
+                             "t": t, "p": p}])
+    return tab, summary
 
 
 def real_events(wide: pd.DataFrame, truth: pd.DataFrame, cfg: dict) -> pd.DataFrame:

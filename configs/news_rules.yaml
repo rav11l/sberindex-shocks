@@ -34,7 +34,7 @@ types:
     scope: local
     expected_sign: positive          # выплаты пострадавшим; прямой ущерб даёт обратный знак, это проверяется в отчёте
     url_regex: "navodnen|pavod|zatoplen|podtoplen|proryv-damb|dambu|evakuats|flood|dam-(burst|breach)|evacuat"
-    url_exclude: "ukrain|kyiv|kiev|drone|shell|missile|strike|attack|incursion|war-|nato|zaporizh|kakhovka|nuclear-plant|front|border-cities|belgorod|kursk|bryansk|shebekino|sudzha"
+    url_exclude: "ukrain|kyiv|kiev|drone|shell|missile|strike|attack|incursion|war-|nato|zaporizh|kakhovka|kharkiv|vovchansk|children|troops|invasion|nuclear-plant|front|border-cities|belgorod|kursk|bryansk|shebekino|sudzha"
     cameo_codes: ["0233", "073"]      # призыв к гуманитарной помощи; оказание гуманитарной помощи
     cameo_requires_url: true
   trade_restriction:

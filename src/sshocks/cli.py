@@ -7,6 +7,8 @@
   figures      рисунки для отчёта
   news         GDELT: загрузка (--download), разметка правилами, выборка для ручной проверки
   merge        объединение прогнозов из нескольких каталогов (--inputs)
+  analyze      ансамбли и разрез ошибок по размеру МО
+  sweep        кривые точность–полнота по порогам детекторов
   all          всё по порядку
 """
 from __future__ import annotations
@@ -116,6 +118,12 @@ def cmd_changepoint(cfg, args):
     truth = events.truth_changepoints(reg, wide.index)
     real = benchmark.real_events(wide, truth, cfg)
     real.to_csv(o / "changepoint_real_events.csv", index=False)
+    c = cfg["changepoint"]
+    tab, summary = benchmark.event_study(wide, truth, tuple(c.get("study_pre", ["2024-01-01", "2024-03-01"])),
+                                         tuple(c.get("study_post", ["2024-04-01", "2024-06-01"])))
+    tab.to_csv(o / "event_study.csv", index=False)
+    summary.to_csv(o / "event_study_summary.csv", index=False)
+    print(summary.round(2).to_string(index=False))
     if len(real):
         print(real.to_string(index=False))
     return res
@@ -178,6 +186,49 @@ def cmd_news(cfg, args):
     print(rec.to_string(index=False))
 
 
+def cmd_sweep(cfg, args):
+    """Кривые точность–полнота по порогам детекторов и сравнение при равной доле ложных тревог."""
+    wide = _wide(cfg)
+    res = benchmark.sweep(wide, cfg)
+    o = out_dir(cfg)
+    res.to_csv(o / "changepoint_sweep.csv", index=False)
+    eq = benchmark.at_equal_false_alarms(res, cfg["changepoint"].get("fa_target", 3.0))
+    eq.to_csv(o / "changepoint_equal_fa.csv", index=False)
+    print(eq.to_string(index=False))
+    return res
+
+
+def cmd_analyze(cfg, args):
+    """Ансамбли и разрез ошибок по размеру МО поверх готовой таблицы прогнозов."""
+    from . import analysis
+    o = out_dir(cfg)
+    pred = pd.read_parquet(o / "forecast_predictions.parquet")
+    wide = _wide(cfg)
+    level = analysis.size_groups(wide)
+    have = set(pred["model"])
+    combos = [c for c in cfg.get("analysis", {}).get("ensembles", []) if set(c["members"]) <= have]
+    parts = [pred]
+    for c in combos:
+        parts.append(analysis.combine(pred, c["members"], c["name"], c.get("how", "mean")))
+    for c in cfg.get("analysis", {}).get("switches", []):
+        if {c["big"], c["small"]} <= have:
+            parts.append(analysis.switch(pred, c["big"], c["small"], level, c.get("q", 0.8), c["name"]))
+    full = pd.concat(parts, ignore_index=True)
+    m = backtest.metrics(full).sort_values("MAE")
+    m.to_csv(o / "analysis_metrics.csv", index=False)
+    by = analysis.metrics_by_size(full, level, cfg.get("analysis", {}).get("size_groups", 5))
+    by.to_csv(o / "analysis_by_size.csv", index=False)
+    best = analysis.best_by_size(by)
+    best.to_csv(o / "analysis_best_by_size.csv", index=False)
+    base = cfg.get("analysis", {}).get("dm_base", "prophet")
+    if base in set(full["model"]):
+        pd.DataFrame([backtest.dm_test(full, a, base) for a in m["model"] if a != base]).to_csv(
+            o / "analysis_dm.csv", index=False)
+    print(m.to_string(index=False))
+    print(best.to_string(index=False))
+    return m
+
+
 def cmd_figures(cfg, args):
     from . import figures
     figures.make_all(cfg)
@@ -185,7 +236,7 @@ def cmd_figures(cfg, args):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="sshocks")
-    ap.add_argument("command", choices=["data", "forecast", "changepoint", "figures", "news", "merge", "all"])
+    ap.add_argument("command", choices=["data", "forecast", "changepoint", "figures", "news", "merge", "analyze", "sweep", "all"])
     ap.add_argument("--config", default="configs/default.yaml")
     ap.add_argument("--set", nargs="*", default=[], help="переопределение ключей: forecast.max_series=200")
     ap.add_argument("--download", action="store_true")

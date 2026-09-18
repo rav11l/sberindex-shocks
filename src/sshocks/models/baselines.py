@@ -68,8 +68,15 @@ def ets_relative(wide: pd.DataFrame, horizons, panel: pd.DataFrame | None = None
 
 
 def prophet(wide: pd.DataFrame, horizons, max_series: int | None = None, yearly_fourier: int = 3,
-            seed: int = 0, **_):
-    """Prophet на каждом ряду отдельно, как базовая модель в условиях конкурса."""
+            seed: int = 0, seasonality_mode: str = "additive", changepoint_prior_scale: float = 0.05,
+            seasonality_prior_scale: float = 10.0, n_changepoints: int | None = None,
+            growth: str = "linear", log: bool = False, **_):
+    """Prophet на каждом ряду отдельно, как базовая модель в условиях конкурса.
+
+    Настройки вынесены в параметры: сравнение с нашей моделью не должно держаться на одной
+    неудачной конфигурации базовой (configs/prophet_sensitivity.yaml, docs/full_run.md §1б).
+    log=True — подгонка на логарифме ряда, прогноз возвращается в рубли.
+    """
     from prophet import Prophet
 
     logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
@@ -81,13 +88,23 @@ def prophet(wide: pd.DataFrame, horizons, max_series: int | None = None, yearly_
     res = {}
     for sid in idx:
         s = wide.loc[sid].dropna()
-        df = pd.DataFrame({"ds": s.index, "y": s.values})
-        m = Prophet(yearly_seasonality=yearly_fourier, weekly_seasonality=False, daily_seasonality=False)
+        y = np.log(s.values) if log else s.values
+        df = pd.DataFrame({"ds": s.index, "y": y})
+        kw = dict(yearly_seasonality=yearly_fourier, weekly_seasonality=False, daily_seasonality=False,
+                  seasonality_mode=seasonality_mode, changepoint_prior_scale=changepoint_prior_scale,
+                  seasonality_prior_scale=seasonality_prior_scale, growth=growth)
+        if n_changepoints is not None:
+            kw["n_changepoints"] = n_changepoints
+        if growth == "flat":
+            kw.pop("changepoint_prior_scale")
+        m = Prophet(**kw)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             m.fit(df)
         fut = m.make_future_dataframe(periods=H, freq="MS", include_history=False)
         yhat = m.predict(fut)["yhat"].to_numpy()
+        if log:
+            yhat = np.exp(yhat)
         res[sid] = {h: yhat[h - 1] for h in horizons}
     return pd.DataFrame(res).T.reindex(wide.index)
 

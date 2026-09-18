@@ -1,0 +1,48 @@
+# Чувствительность базовой модели к настройкам: одиннадцать конфигураций Prophet на общей выборке МО.
+# Запуск: python -m sshocks.cli forecast --config configs/prophet_sensitivity.yaml
+# Вывод: outputs_prophet/forecast_metrics.csv — сравнение с ets_relative и snaive_growth в тех же условиях.
+seed: 42
+output_dir: outputs_prophet
+
+data:
+  raw_dir: data/raw
+  file: sberindex_mo_spending.parquet
+  hashes: data/hashes.json
+  download_if_missing: false
+  category: Все категории
+  min_obs: 24
+
+events:
+  registry: data/events/registry.csv
+  only_verified: true
+
+forecast:
+  horizons: [1, 2, 3]
+  origins: ["2024-06-01", "2024-07-01", "2024-08-01", "2024-09-01"]
+  max_series: 400
+  models:
+    snaive_growth:   {window: 3}
+    ets_relative:    {}
+    prophet:         {yearly_fourier: 3}                                   # наша конфигурация
+    p_fourier1:      {fn: prophet, yearly_fourier: 1}
+    p_fourier5:      {fn: prophet, yearly_fourier: 5}
+    p_fourier10:     {fn: prophet, yearly_fourier: 10}
+    p_mult:          {fn: prophet, yearly_fourier: 3, seasonality_mode: multiplicative}
+    p_cps001:        {fn: prophet, yearly_fourier: 3, changepoint_prior_scale: 0.01}
+    p_cps05:         {fn: prophet, yearly_fourier: 3, changepoint_prior_scale: 0.5}
+    p_nochangepoint: {fn: prophet, yearly_fourier: 3, n_changepoints: 0}
+    p_flat:          {fn: prophet, yearly_fourier: 3, growth: flat}
+    p_log:           {fn: prophet, yearly_fourier: 3, log: true}
+    p_log_flat:      {fn: prophet, yearly_fourier: 3, log: true, growth: flat}
+
+changepoint:
+  eval_start: "2024-04-01"
+  eval_end: "2024-12-01"
+  max_series: 100
+  repeats: 1
+  share_shocked: 0.5
+  deltas: [-0.10, 0.10]
+  max_delay: 2
+  news_simulation: {recall_news: 0.6, false_news_rate: 0.05}
+  detectors:
+    cross_section: {k: 3.0}
