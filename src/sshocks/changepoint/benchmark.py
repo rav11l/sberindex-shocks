@@ -169,9 +169,38 @@ def sweep(wide: pd.DataFrame, cfg: dict) -> pd.DataFrame:
                                  **score(A, truth, c.get("max_delay", 2))})
                     log.info("%s %s=%s: P=%.2f R=%.2f FA=%.1f", name + suffix, param, val,
                              rows[-1]["precision"], rows[-1]["recall"], rows[-1]["false_alarms_per_100_clean_months"])
-    out = (pd.DataFrame(rows).groupby(["detector", "param", "value"]).mean(numeric_only=True)
+    raw = pd.DataFrame(rows)
+    out = (raw.groupby(["detector", "param", "value"]).mean(numeric_only=True)
            .drop(columns="repeat").reset_index())
-    return out.sort_values(["detector", "value"])
+    return out.sort_values(["detector", "value"]), raw
+
+
+def threshold_holdout(raw: pd.DataFrame, target: float = 3.0) -> pd.DataFrame:
+    """Порог выбирается на одном наборе инъекций, а качество отчитывается на другом.
+
+    Повтор 0 — окно отбора, повтор 1 — отчёт. Так видно, сколько из заявленной полноты
+    объясняется подгонкой порога под ту же симуляцию.
+    """
+    if raw["repeat"].nunique() < 2:
+        return pd.DataFrame()
+    sel, rep = raw[raw["repeat"] == 0], raw[raw["repeat"] == 1]
+    rows = []
+    for det, g in sel.groupby("detector"):
+        ok = g[g["false_alarms_per_100_clean_months"] <= target]
+        # если ни одна настройка не укладывается в целевую долю ложных тревог, берём самую экономную
+        pick = (ok.sort_values("recall", ascending=False) if len(ok)
+                else g.sort_values("false_alarms_per_100_clean_months")).iloc[0]
+        r = rep[(rep["detector"] == det) & (rep["value"] == pick["value"])]
+        if r.empty:
+            continue
+        r = r.iloc[0]
+        rows.append({"detector": det, "param": pick["param"], "value": pick["value"],
+                     "recall_selection": pick["recall"], "recall_holdout": r["recall"],
+                     "precision_holdout": r["precision"],
+                     "fa_selection": pick["false_alarms_per_100_clean_months"],
+                     "fa_holdout": r["false_alarms_per_100_clean_months"],
+                     "recall_over_random_holdout": r.get("recall_over_random")})
+    return pd.DataFrame(rows).sort_values("recall_holdout", ascending=False).reset_index(drop=True)
 
 
 def at_equal_false_alarms(sweep_res: pd.DataFrame, target: float = 3.0) -> pd.DataFrame:

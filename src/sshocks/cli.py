@@ -196,9 +196,14 @@ def cmd_news(cfg, args):
 def cmd_sweep(cfg, args):
     """Кривые точность–полнота по порогам детекторов и сравнение при равной доле ложных тревог."""
     wide = _wide(cfg)
-    res = benchmark.sweep(wide, cfg)
+    res, raw = benchmark.sweep(wide, cfg)
     o = out_dir(cfg)
     res.to_csv(o / "changepoint_sweep.csv", index=False)
+    raw.to_csv(o / "changepoint_sweep_raw.csv", index=False)
+    hold = benchmark.threshold_holdout(raw, cfg["changepoint"].get("fa_target", 3.0))
+    if len(hold):
+        hold.to_csv(o / "changepoint_threshold_holdout.csv", index=False)
+        print(hold.round(3).to_string(index=False))
     eq = benchmark.at_equal_false_alarms(res, cfg["changepoint"].get("fa_target", 3.0))
     eq.to_csv(o / "changepoint_equal_fa.csv", index=False)
     print(eq.to_string(index=False))
