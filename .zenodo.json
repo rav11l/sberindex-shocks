@@ -21,6 +21,7 @@
   "access_right": "open",
   "language": "rus",
   "related_identifiers": [
-    {"identifier": "https://digitaleconomylab.ru/sberindex-shocks", "relation": "isDocumentedBy", "resource_type": "publication-other", "scheme": "url"}
+    {"identifier": "https://digitaleconomylab.ru/sberindex-shocks", "relation": "isDocumentedBy", "resource_type": "publication-other", "scheme": "url"},
+    {"identifier": "https://github.com/rav11l/sberindex-shocks", "relation": "isSupplementTo", "scheme": "url"}
   ]
 }
